@@ -7,34 +7,9 @@ import {
   useState,
   ReactNode,
 } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-
-/** Safety cap for DB profile fetch only (not a delay—only triggers if the request hangs). */
-const PROFILE_FETCH_MS = 8_000;
-
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label}_timeout`)), ms);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(timer!);
-  }
-}
-
-/** Clears broken or stale client auth storage without requiring a server round-trip. */
-async function clearLocalAuthSession(): Promise<void> {
-  try {
-    await supabase.auth.signOut({ scope: "local" });
-  } catch {
-    /* ignore */
-  }
-}
 
 export type UserProfile = {
   id: string;
@@ -66,7 +41,7 @@ export type LawyerData = {
 
 type AuthCtx = {
   user: UserProfile | null;
-  /** True only while restoring session on app load (routes should wait). */
+  /** True only while resolving the initial Supabase session (not while loading profile rows). */
   loading: boolean;
   login: (email: string, password: string) => Promise<UserProfile | null>;
   signup: (
@@ -82,6 +57,100 @@ type AuthCtx = {
 
 const AuthContext = createContext<AuthCtx | undefined>(undefined);
 
+type ProfileRow = {
+  id: string;
+  email: string;
+  name: string;
+  language: "en" | "hi";
+  role: "user" | "lawyer";
+  bar_council_id?: string;
+  license_number?: string;
+  specialization?: string;
+  experience?: string;
+  location?: string;
+  languages?: string[];
+  phone?: string;
+  bio?: string;
+  is_verified?: boolean;
+};
+
+function mapProfileRow(profile: ProfileRow): UserProfile {
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    language: profile.language,
+    role: profile.role,
+    barCouncilId: profile.bar_council_id,
+    licenseNumber: profile.license_number,
+    specialization: profile.specialization,
+    experience: profile.experience,
+    location: profile.location,
+    languages: profile.languages,
+    phone: profile.phone,
+    bio: profile.bio,
+    isVerified: profile.is_verified,
+  };
+}
+
+/** When the DB row is missing or unreadable, keep the app usable from JWT + user_metadata. */
+function buildFallbackProfile(authUser: User): UserProfile {
+  const meta = authUser.user_metadata ?? {};
+  const roleRaw = typeof meta.role === "string" ? meta.role : "user";
+  const role: "user" | "lawyer" = roleRaw === "lawyer" ? "lawyer" : "user";
+  const name =
+    typeof meta.name === "string" && meta.name.trim().length > 0
+      ? meta.name.trim()
+      : (authUser.email?.split("@")[0] ?? "User");
+
+  return {
+    id: authUser.id,
+    email: authUser.email ?? "",
+    name,
+    language: "en",
+    role,
+    barCouncilId: typeof meta.barCouncilId === "string" ? meta.barCouncilId : undefined,
+    licenseNumber: typeof meta.licenseNumber === "string" ? meta.licenseNumber : undefined,
+    specialization: typeof meta.specialization === "string" ? meta.specialization : undefined,
+    experience: typeof meta.experience === "string" ? meta.experience : undefined,
+    location: typeof meta.location === "string" ? meta.location : undefined,
+    languages: Array.isArray(meta.languages) ? meta.languages : undefined,
+    phone: typeof meta.phone === "string" ? meta.phone : undefined,
+    bio: typeof meta.bio === "string" ? meta.bio : undefined,
+  };
+}
+
+function buildInsertRowFromAuthUser(authUser: User): Record<string, unknown> {
+  const meta = authUser.user_metadata ?? {};
+  const roleRaw = typeof meta.role === "string" ? meta.role : "user";
+  const role: "user" | "lawyer" = roleRaw === "lawyer" ? "lawyer" : "user";
+  const name =
+    typeof meta.name === "string" && meta.name.trim().length > 0
+      ? meta.name.trim()
+      : (authUser.email?.split("@")[0] ?? "User");
+
+  const insertRow: Record<string, unknown> = {
+    id: authUser.id,
+    email: authUser.email ?? "",
+    name,
+    language: "en",
+    role,
+  };
+
+  if (role === "lawyer") {
+    insertRow.bar_council_id = typeof meta.barCouncilId === "string" ? meta.barCouncilId : null;
+    insertRow.license_number = typeof meta.licenseNumber === "string" ? meta.licenseNumber : null;
+    insertRow.specialization = typeof meta.specialization === "string" ? meta.specialization : null;
+    insertRow.experience = typeof meta.experience === "string" ? meta.experience : null;
+    insertRow.location = typeof meta.location === "string" ? meta.location : null;
+    insertRow.languages = Array.isArray(meta.languages) ? meta.languages : null;
+    insertRow.phone = typeof meta.phone === "string" ? meta.phone : null;
+    insertRow.bio = typeof meta.bio === "string" ? meta.bio : null;
+  }
+
+  return insertRow;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,158 +159,112 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userRef.current = user;
   }, [user]);
 
-  type ProfileRow = {
-    id: string;
-    email: string;
-    name: string;
-    language: "en" | "hi";
-    role: "user" | "lawyer";
-    bar_council_id?: string;
-    license_number?: string;
-    specialization?: string;
-    experience?: string;
-    location?: string;
-    languages?: string[];
-    phone?: string;
-    bio?: string;
-    is_verified?: boolean;
-  };
+  /**
+   * Loads `profiles` for authUser. Never throws. Does not sign out.
+   * On any failure or missing row after insert attempt, returns a fallback built from the session.
+   */
+  const loadUserFromAuth = useCallback(async (authUser: User | null): Promise<UserProfile | null> => {
+    if (!authUser?.id) {
+      return null;
+    }
 
-  const fetchProfile = useCallback(
-    async (authUser: User | null): Promise<UserProfile | null> => {
-      const mapProfile = (profile: ProfileRow): UserProfile => ({
-        id: profile.id,
-        email: profile.email,
-        name: profile.name,
-        language: profile.language,
-        role: profile.role,
-        barCouncilId: profile.bar_council_id,
-        licenseNumber: profile.license_number,
-        specialization: profile.specialization,
-        experience: profile.experience,
-        location: profile.location,
-        languages: profile.languages,
-        phone: profile.phone,
-        bio: profile.bio,
-        isVerified: profile.is_verified,
-      });
-      if (!authUser?.id) {
-        return null;
-      }
-
-      const readProfile = async (): Promise<ProfileRow | null> => {
-        const { data: profile, error } = await supabase
+    const readProfile = async (): Promise<{ row: ProfileRow | null; error: Error | null }> => {
+      try {
+        const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", authUser.id)
           .maybeSingle();
 
         if (error) {
-          console.error("Profile fetch error:", error);
-          return null;
+          console.error("[Auth] profiles SELECT error:", error.message, error.code ?? "");
+          return { row: null, error: new Error(error.message) };
         }
-        return profile;
-      };
-
-      let profile = await readProfile();
-
-      if (!profile) {
-        const meta = authUser.user_metadata ?? {};
-        const roleRaw = typeof meta.role === "string" ? meta.role : "user";
-        const role: "user" | "lawyer" = roleRaw === "lawyer" ? "lawyer" : "user";
-        const name =
-          typeof meta.name === "string" && meta.name.trim().length > 0
-            ? meta.name.trim()
-            : (authUser.email?.split("@")[0] ?? "User");
-
-        const insertRow: Record<string, unknown> = {
-          id: authUser.id,
-          email: authUser.email ?? "",
-          name,
-          language: "en",
-          role,
-        };
-
-        if (role === "lawyer") {
-          insertRow.bar_council_id = typeof meta.barCouncilId === "string" ? meta.barCouncilId : null;
-          insertRow.license_number = typeof meta.licenseNumber === "string" ? meta.licenseNumber : null;
-          insertRow.specialization = typeof meta.specialization === "string" ? meta.specialization : null;
-          insertRow.experience = typeof meta.experience === "string" ? meta.experience : null;
-          insertRow.location = typeof meta.location === "string" ? meta.location : null;
-          insertRow.languages = Array.isArray(meta.languages) ? meta.languages : null;
-          insertRow.phone = typeof meta.phone === "string" ? meta.phone : null;
-          insertRow.bio = typeof meta.bio === "string" ? meta.bio : null;
-        }
-
-        const { error: insertError } = await supabase.from("profiles").insert(insertRow as never);
-        if (insertError?.code === "23505") {
-          profile = await readProfile();
-        } else if (insertError) {
-          console.error("Profile recovery insert failed:", insertError);
-          return null;
-        } else {
-          profile = await readProfile();
-        }
+        return { row: data as ProfileRow | null, error: null };
+      } catch (e) {
+        console.error("[Auth] profiles SELECT exception:", e);
+        return { row: null, error: e instanceof Error ? e : new Error(String(e)) };
       }
+    };
 
-      if (!profile) {
-        return null;
+    const { row: initialRow, error: readError } = await readProfile();
+    if (initialRow) {
+      return mapProfileRow(initialRow);
+    }
+
+    if (readError) {
+      console.warn("[Auth] Using session fallback profile (read failed).");
+      return buildFallbackProfile(authUser);
+    }
+
+    const insertRow = buildInsertRowFromAuthUser(authUser);
+    try {
+      const { error: insertError } = await supabase.from("profiles").insert(insertRow as never);
+
+      if (insertError) {
+        if (insertError.code === "23505") {
+          const { row: rowAfterConflict } = await readProfile();
+          if (rowAfterConflict) {
+            return mapProfileRow(rowAfterConflict);
+          }
+        }
+        console.error("[Auth] profiles INSERT error:", insertError.message, insertError.code ?? "");
+        console.warn("[Auth] Using session fallback profile (insert failed).");
+        return buildFallbackProfile(authUser);
       }
+    } catch (e) {
+      console.error("[Auth] profiles INSERT exception:", e);
+      console.warn("[Auth] Using session fallback profile (insert exception).");
+      return buildFallbackProfile(authUser);
+    }
 
-      return mapProfile(profile);
-    },
-    []
-  );
+    const { row: rowAfterInsert } = await readProfile();
+    if (rowAfterInsert) {
+      return mapProfileRow(rowAfterInsert);
+    }
+
+    console.warn("[Auth] Profile row still missing after insert; using session fallback.");
+    return buildFallbackProfile(authUser);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    const resolveUser = async (session: Session | null): Promise<UserProfile | null> => {
-      if (!session?.user) {
-        return null;
-      }
-      try {
-        return await withTimeout(fetchProfile(session.user), PROFILE_FETCH_MS, "profile");
-      } catch (e) {
-        console.warn("Profile load timed out or failed:", e);
-        return null;
+    const finishInitialLoad = () => {
+      if (!cancelled) {
+        setLoading(false);
       }
     };
 
     const initAuth = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("[Auth] getSession error:", error.message, error.name);
+        }
 
         if (cancelled) {
           return;
         }
 
+        const session = data.session ?? null;
+
         if (session?.user) {
-          const profile = await resolveUser(session);
-          if (cancelled) {
-            return;
-          }
-          if (!profile) {
-            await clearLocalAuthSession();
-            setUser(null);
-          } else {
+          const profile = await loadUserFromAuth(session.user);
+          if (!cancelled) {
             setUser(profile);
           }
         } else {
           setUser(null);
         }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        await clearLocalAuthSession();
+      } catch (e) {
+        console.error("[Auth] initAuth failed:", e);
         if (!cancelled) {
           setUser(null);
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        finishInitialLoad();
       }
     };
 
@@ -255,7 +278,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        // First load is handled by initAuth(); this event would duplicate work and can race.
         if (event === "INITIAL_SESSION") {
           return;
         }
@@ -269,22 +291,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const profile = await resolveUser(session);
-        if (cancelled) {
-          return;
-        }
-
-        if (!profile) {
-          await clearLocalAuthSession();
-          setUser(null);
-          return;
-        }
-
-        setUser(profile);
-      } catch (error) {
-        console.error("Auth state change error:", error);
-        await clearLocalAuthSession();
+        const profile = await loadUserFromAuth(session.user);
         if (!cancelled) {
+          setUser(profile);
+        }
+      } catch (e) {
+        console.error("[Auth] onAuthStateChange handler error:", e);
+        if (!cancelled && session?.user) {
+          setUser(buildFallbackProfile(session.user));
+        } else if (!cancelled) {
           setUser(null);
         }
       }
@@ -294,7 +309,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [loadUserFromAuth]);
 
   const login = async (email: string, password: string): Promise<UserProfile | null> => {
     try {
@@ -304,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error("Login error:", error);
+        console.error("[Auth] signInWithPassword error:", error.message, error.code ?? "");
         throw error;
       }
 
@@ -313,14 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Failed to retrieve authenticated user from Supabase");
       }
 
-      const profile = await fetchProfile(authUser);
-      if (!profile) {
-        await supabase.auth.signOut();
-        setUser(null);
-        throw new Error(
-          "Your account has no profile row in the database. Run the profiles trigger/schema in Supabase or contact support."
-        );
-      }
+      const profile = await loadUserFromAuth(authUser);
       setUser(profile);
       return profile;
     } catch (error: unknown) {
@@ -350,21 +358,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        console.error("Signup error:", error);
+        console.error("[Auth] signUp error:", error.message, error.code ?? "");
         throw error;
       }
 
       const authUser = data.user ?? data.session?.user;
       if (!authUser) {
+        console.warn("[Auth] signUp returned no user (e.g. email confirmation required).");
         return null;
       }
 
-      const profile = await fetchProfile(authUser);
+      const profile = await loadUserFromAuth(authUser);
       setUser(profile);
       return profile;
     } catch (error: unknown) {
       const err = error as { message?: string; code?: string };
-      console.error("Signup error:", err);
+      console.error("[Auth] signup catch:", err);
       throw new Error(err.message || err.code || "Signup failed");
     }
   };
@@ -373,13 +382,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error("Logout error:", error);
+        console.error("[Auth] signOut error:", error.message, error.code ?? "");
         throw error;
       }
 
       setUser(null);
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("[Auth] logout error:", error);
       toast.error("Could not log out. Please try again.");
       throw error;
     }
@@ -397,14 +406,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (patch.role !== undefined) row.role = patch.role;
       const { error } = await supabase.from("profiles").update(row).eq("id", user.id);
       if (error) {
-        console.error("Update profile error:", error);
+        console.error("[Auth] profile UPDATE error:", error.message, error.code ?? "");
         throw error;
       }
 
       setUser((prev) => (prev ? { ...prev, ...patch } : null));
       toast.success("Profile updated");
     } catch (error) {
-      console.error("Update profile error:", error);
+      console.error("[Auth] updateProfile error:", error);
       throw error;
     }
   };
