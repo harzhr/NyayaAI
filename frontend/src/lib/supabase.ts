@@ -7,8 +7,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Missing Supabase configuration. Check .env file.");
 }
 
-const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,

@@ -1,7 +1,40 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+} from "react";
+import type { Session } from "@supabase/supabase-js";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+
+/** Safety cap for DB profile fetch only (not a delay—only triggers if the request hangs). */
+const PROFILE_FETCH_MS = 8_000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}_timeout`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+/** Clears broken or stale client auth storage without requiring a server round-trip. */
+async function clearLocalAuthSession(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    /* ignore */
+  }
+}
 
 export type UserProfile = {
   id: string;
@@ -52,7 +85,10 @@ const AuthContext = createContext<AuthCtx | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialLoadDone = useCallback(() => setLoading(false), []);
+  const userRef = useRef<UserProfile | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   type ProfileRow = {
     id: string;
@@ -158,46 +194,107 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    let cancelled = false;
+
+    const resolveUser = async (session: Session | null): Promise<UserProfile | null> => {
+      if (!session?.user) {
+        return null;
+      }
+      try {
+        return await withTimeout(fetchProfile(session.user), PROFILE_FETCH_MS, "profile");
+      } catch (e) {
+        console.warn("Profile load timed out or failed:", e);
+        return null;
+      }
+    };
+
     const initAuth = async () => {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
+        if (cancelled) {
+          return;
+        }
+
         if (session?.user) {
-          const profile = await fetchProfile(session.user);
-          setUser(profile);
+          const profile = await resolveUser(session);
+          if (cancelled) {
+            return;
+          }
+          if (!profile) {
+            await clearLocalAuthSession();
+            setUser(null);
+          } else {
+            setUser(profile);
+          }
         } else {
           setUser(null);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
+        await clearLocalAuthSession();
+        if (!cancelled) {
+          setUser(null);
+        }
       } finally {
-        initialLoadDone();
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    initAuth();
+    void initAuth();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) {
+        return;
+      }
+
       try {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user);
-          setUser(profile);
-        } else {
-          setUser(null);
+        // First load is handled by initAuth(); this event would duplicate work and can race.
+        if (event === "INITIAL_SESSION") {
+          return;
         }
+
+        if (event === "TOKEN_REFRESHED" && session?.user?.id === userRef.current?.id) {
+          return;
+        }
+
+        if (!session?.user) {
+          setUser(null);
+          return;
+        }
+
+        const profile = await resolveUser(session);
+        if (cancelled) {
+          return;
+        }
+
+        if (!profile) {
+          await clearLocalAuthSession();
+          setUser(null);
+          return;
+        }
+
+        setUser(profile);
       } catch (error) {
         console.error("Auth state change error:", error);
+        await clearLocalAuthSession();
+        if (!cancelled) {
+          setUser(null);
+        }
       }
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, initialLoadDone]);
+  }, [fetchProfile]);
 
   const login = async (email: string, password: string): Promise<UserProfile | null> => {
     try {
