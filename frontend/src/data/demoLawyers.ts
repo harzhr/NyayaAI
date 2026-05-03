@@ -1,0 +1,148 @@
+/** Showcase advocates (no auth). Keys are stable IDs stored in `lawyer_chats.demo_lawyer_key`. */
+export type DemoLawyer = {
+  key: string;
+  name: string;
+  title: string;
+  specialization: string;
+  experience: string;
+  location: string;
+  languages: string[];
+  barCouncil: string;
+  courts: string;
+  bio: string;
+  /** Short tags for filtering on the directory page */
+  tags: string[];
+};
+
+export const DEMO_LAWYERS: DemoLawyer[] = [
+  {
+    key: "adv-kavita-reddy",
+    name: "Kavita Reddy",
+    title: "Advocate-on-Record, High Court",
+    specialization: "Writ jurisdiction & service matters",
+    experience: "14 years",
+    location: "Hyderabad, Telangana",
+    languages: ["Telugu", "English", "Hindi"],
+    barCouncil: "Bar Council of Telangana",
+    courts: "Telangana High Court, Central Administrative Tribunal (Hyderabad)",
+    bio: "Handles Article 226 writs, government employment disputes, and pension matters. Former law officer experience with disciplined drafting for tribunal and high court filings.",
+    tags: ["Constitutional", "Service law", "Writs"],
+  },
+  {
+    key: "adv-arjun-menon",
+    name: "Arjun Menon",
+    title: "Advocate",
+    specialization: "Insolvency & debt recovery (IBC, SARFAESI)",
+    experience: "11 years",
+    location: "Mumbai, Maharashtra",
+    languages: ["Malayalam", "English", "Hindi", "Marathi"],
+    barCouncil: "Bar Council of Maharashtra & Goa",
+    courts: "NCLT Mumbai, DRT Mumbai, Bombay High Court",
+    bio: "Advises financial creditors and operational creditors on Corporate Insolvency Resolution Process, liquidation applications, and security enforcement under SARFAESI.",
+    tags: ["IBC", "Banking", "NCLT"],
+  },
+  {
+    key: "adv-sunita-devi",
+    name: "Sunita Devi",
+    title: "Senior Advocate (designation pending)",
+    specialization: "Matrimonial & maintenance (Hindu Marriage Act, DV Act)",
+    experience: "16 years",
+    location: "Patna, Bihar",
+    languages: ["Hindi", "Maithili", "English"],
+    barCouncil: "Bar Council of Bihar",
+    courts: "Family Court Patna, Patna High Court",
+    bio: "Focus on divorce, restitution, 125 CrPC maintenance, and protection orders. Regular mediation referrals with emphasis on child welfare and settlement where appropriate.",
+    tags: ["Family law", "Domestic violence", "Mediation"],
+  },
+  {
+    key: "adv-harpreet-singh-gill",
+    name: "Harpreet Singh Gill",
+    title: "Advocate",
+    specialization: "Criminal trial & bail (IPC, CrPC)",
+    experience: "13 years",
+    location: "Chandigarh",
+    languages: ["Punjabi", "Hindi", "English"],
+    barCouncil: "Bar Council of Punjab & Haryana",
+    courts: "Punjab & Haryana High Court, Sessions Courts Chandigarh",
+    bio: "Bail strategy for non-bailable offences, charge-sheet scrutiny, trial preparation, and appeals. Experience across economic offences and general IPC chapters.",
+    tags: ["Criminal law", "Bail", "Trial"],
+  },
+  {
+    key: "adv-deepa-natarajan",
+    name: "Deepa Natarajan",
+    title: "Advocate",
+    specialization: "Labour & industrial disputes (ID Act, standing orders)",
+    experience: "9 years",
+    location: "Chennai, Tamil Nadu",
+    languages: ["Tamil", "English"],
+    barCouncil: "Bar Council of Tamil Nadu",
+    courts: "Labour Court Chennai, Madras High Court",
+    bio: "Represents workmen and employers in termination disputes, recognition issues, and industrial closure proceedings. Advises on POSH committee compliance.",
+    tags: ["Labour", "Industrial", "POSH"],
+  },
+  {
+    key: "adv-rajesh-khanna",
+    name: "Rajesh Khanna",
+    title: "Advocate",
+    specialization: "RERA & real estate agreements",
+    experience: "10 years",
+    location: "Gurugram, Haryana",
+    languages: ["Hindi", "English"],
+    barCouncil: "Bar Council of Delhi (practice: Haryana RERA)",
+    courts: "HRERA Gurugram, Punjab & Haryana High Court",
+    bio: "Buyer-side and builder-side disputes: delayed possession, refund claims, and agreement interpretation. Experience before Haryana and Uttar Pradesh RERA benches.",
+    tags: ["RERA", "Property", "Consumer"],
+  },
+  {
+    key: "adv-fatima-zaidi",
+    name: "Fatima Zaidi",
+    title: "Advocate",
+    specialization: "Cheque dishonour & NI Act (138)",
+    experience: "8 years",
+    location: "Lucknow, Uttar Pradesh",
+    languages: ["Urdu", "Hindi", "English"],
+    barCouncil: "Bar Council of Uttar Pradesh",
+    courts: "Sessions Court Lucknow, Allahabad High Court (Lucknow Bench)",
+    bio: "Complaints under Section 138 of the Negotiable Instruments Act, compounding negotiations, and parallel civil recovery. High volume practice with tight limitation tracking.",
+    tags: ["NI Act", "Cheque bounce", "Recovery"],
+  },
+  {
+    key: "adv-rohan-bhattacharya",
+    name: "Rohan Bhattacharya",
+    title: "Advocate",
+    specialization: "GST & indirect tax litigation",
+    experience: "12 years",
+    location: "Kolkata, West Bengal",
+    languages: ["Bengali", "English", "Hindi"],
+    barCouncil: "Bar Council of West Bengal",
+    courts: "GST Appellate Tribunal (zone), Calcutta High Court",
+    bio: "Assessment appeals, input tax credit disputes, and classification controversies. Advises exporters and MSMEs on litigation strategy before departmental and appellate forums.",
+    tags: ["GST", "Tax", "MSME"],
+  },
+  {
+    key: "adv-meera-kulkarni",
+    name: "Meera Kulkarni",
+    title: "Advocate",
+    specialization: "Intellectual property & technology contracts",
+    experience: "7 years",
+    location: "Pune, Maharashtra",
+    languages: ["Marathi", "English", "Hindi"],
+    barCouncil: "Bar Council of Maharashtra & Goa",
+    courts: "District Court Pune, Bombay High Court (commercial division)",
+    bio: "Trademark opposition, copyright software disputes, and SaaS licensing. Drafts technology assignment and non-disclosure agreements for startups.",
+    tags: ["IPR", "Startups", "Contracts"],
+  },
+  {
+    key: "adv-thomas-george",
+    name: "Thomas George",
+    title: "Advocate",
+    specialization: "Motor accident claims & insurance (MV Act, MACT)",
+    experience: "15 years",
+    location: "Kochi, Kerala",
+    languages: ["Malayalam", "English"],
+    barCouncil: "Bar Council of Kerala",
+    courts: "MACT Ernakulam, Kerala High Court",
+    bio: "Structured claims for permanent disability and loss of dependency, including multi-vehicle collisions and insurer denial defences. Works with medical and accident reconstruction experts.",
+    tags: ["MACT", "Insurance", "Tort"],
+  },
+];
