@@ -24,7 +24,8 @@ export function UserProtectedRoute({ children }: { children: React.ReactNode }) 
   }
 
   if (user.role === "lawyer") {
-    return <Navigate to="/lawyer-dashboard" replace />;
+    const returnTo = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/lawyer-dashboard?returnTo=${returnTo}`} replace />;
   }
 
   return <>{children}</>;

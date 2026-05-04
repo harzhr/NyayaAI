@@ -38,7 +38,7 @@ export default function Login() {
       if (profile?.role === "lawyer") {
         navigate("/lawyer-dashboard");
       } else {
-        navigate(returnTo ?? "/");
+        navigate("/");
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not sign in. Try again.";

@@ -30,7 +30,7 @@ function FullPageSpinner() {
   );
 }
 
-/** Login / signup surfaces: send lawyers to their dashboard, everyone else to AI chat. */
+/** Login / signup surfaces: send lawyers to their dashboard, everyone else to home. */
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -39,7 +39,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    const dest = user.role === "lawyer" ? "/lawyer-dashboard" : "/chat";
+    const dest = user.role === "lawyer" ? "/lawyer-dashboard" : "/";
     return <Navigate to={dest} replace />;
   }
 
@@ -53,7 +53,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Home />} />

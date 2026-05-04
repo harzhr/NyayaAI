@@ -6,7 +6,11 @@ import { DEMO_LAWYERS } from "@/data/demoLawyers";
 import { writePersistedConsult } from "@/lib/lawyerConsultStorage";
 import { ArrowRight, Building2, Globe2, Landmark, MapPin, MessageCircle, Scale, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchRegisteredLawyersForDirectory, type DirectoryLawyer } from "@/lib/lawyerDirectory";
+import {
+  fetchRegisteredLawyersForDirectory,
+  type DirectoryLawyer,
+  type RegisteredLawyerCard,
+} from "@/lib/lawyerDirectory";
 
 function initials(name: string) {
   const parts = name.split(/\s+/).filter(Boolean);
@@ -26,7 +30,7 @@ const accentByIndex = [
 export default function FindLawyerPage() {
   const navigate = useNavigate();
   const [tag, setTag] = useState<string | null>(null);
-  const [registeredLawyers, setRegisteredLawyers] = useState<DirectoryLawyer[]>([]);
+  const [registeredLawyers, setRegisteredLawyers] = useState<RegisteredLawyerCard[]>([]);
   const [loadingRegistered, setLoadingRegistered] = useState(true);
 
   useEffect(() => {
@@ -177,29 +181,31 @@ export default function FindLawyerPage() {
               >
                 <div
                   className={cn(
-                    "h-28 bg-gradient-to-br px-6 py-5",
+                    "min-h-28 bg-gradient-to-br px-6 py-5",
                     accentByIndex[i % accentByIndex.length]
                   )}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-4">
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-background/90 text-lg font-bold text-primary shadow-sm ring-2 ring-primary/10">
                         {initials(lawyer.name)}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-wider text-primary/90">Advocate</p>
-                        <h2 className="font-display text-xl font-bold text-foreground md:text-2xl">{displayName}</h2>
+                        <h2 className="break-words font-display text-xl font-bold leading-tight text-foreground md:text-2xl">
+                          {displayName}
+                        </h2>
                         {isDemo && "title" in lawyer && (
-                          <p className="text-sm text-muted-foreground">{lawyer.title}</p>
+                          <p className="mt-1 break-words text-sm leading-snug text-muted-foreground">{lawyer.title}</p>
                         )}
                       </div>
                     </div>
                     {isDemo ? (
-                      <Badge variant="secondary" className="shrink-0 gap-1 bg-background/80 backdrop-blur">
+                      <Badge variant="secondary" className="w-fit shrink-0 gap-1 bg-background/80 backdrop-blur">
                         <Sparkles className="h-3 w-3" /> Demo profile
                       </Badge>
                     ) : (
-                      <Badge className="shrink-0 bg-emerald-600 hover:bg-emerald-600">On NyayaAI</Badge>
+                      <Badge className="w-fit shrink-0 bg-emerald-600 hover:bg-emerald-600">On NyayaAI</Badge>
                     )}
                   </div>
                 </div>

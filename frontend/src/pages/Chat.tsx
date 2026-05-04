@@ -8,6 +8,12 @@ import { Send, Plus, Scale, Loader2, MessageSquare, AlertCircle } from "lucide-r
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
+import { RecommendedLawyers } from "@/components/lawyer/RecommendedLawyers";
+import {
+  buildLawyerDirectoryList,
+  fetchRegisteredLawyersForDirectory,
+  type DirectoryLawyer,
+} from "@/lib/lawyerDirectory";
 
 export type Message = { id: string; role: "user" | "assistant"; content: string; createdAt: string };
 export type Chat = { id: string; title: string; messages: Message[]; created_at: string };
@@ -115,6 +121,8 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchingHistory, setFetchingHistory] = useState(false);
+  const [lawyers, setLawyers] = useState<DirectoryLawyer[]>([]);
+  const [lawyersLoading, setLawyersLoading] = useState(false);
   const [language, setLanguage] = useState<"en" | "hi">("en");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -137,7 +145,35 @@ export default function ChatPage() {
     }
   }, [user?.language]);
 
+  useEffect(() => {
+    if (!user?.id || lawyers.length > 0) {
+      return;
+    }
+
+    let cancelled = false;
+    setLawyersLoading(true);
+    fetchRegisteredLawyersForDirectory().then(({ lawyers: rows, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.error("lawyers fetch:", error.message);
+      } else {
+        setLawyers(buildLawyerDirectoryList(rows));
+      }
+      setLawyersLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lawyers.length, user?.id]);
+
   const active = useMemo(() => chats.find((c) => c.id === activeId) ?? null, [chats, activeId]);
+  const recommendationQuery = useMemo(() => {
+    const messages = active?.messages ?? [];
+    const latestUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant")?.content ?? "";
+    return [latestUser, latestAssistant].filter(Boolean).join("\n\n");
+  }, [active?.messages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -224,7 +260,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="container mx-auto grid h-[calc(100vh-3.5rem)] max-w-6xl grid-cols-1 gap-4 p-4 lg:grid-cols-[260px_1fr]">
+    <div className="container mx-auto grid h-[calc(100vh-3.5rem)] max-w-7xl grid-cols-1 gap-4 p-4 lg:grid-cols-[240px_minmax(0,1fr)_320px]">
       <Card className="hidden flex-col overflow-hidden lg:flex">
         <div className="border-b p-3">
           <Button onClick={startNew} className="w-full gap-2" size="sm">
@@ -319,19 +355,21 @@ export default function ChatPage() {
                 </p>
               </div>
             ) : (
-              active.messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm shadow-soft ${
-                      m.role === "user"
-                        ? "rounded-br-sm bg-primary text-primary-foreground"
-                        : "rounded-bl-sm border bg-card text-card-foreground"
-                    }`}
-                  >
-                    {m.content}
+              <>
+                {active.messages.map((m) => (
+                  <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm shadow-soft ${
+                        m.role === "user"
+                          ? "rounded-br-sm bg-primary text-primary-foreground"
+                          : "rounded-bl-sm border bg-card text-card-foreground"
+                      }`}
+                    >
+                      {m.content}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -358,6 +396,22 @@ export default function ChatPage() {
           </p>
         </div>
       </Card>
+
+      <aside className="min-h-0 lg:h-full">
+        {recommendationQuery ? (
+          <RecommendedLawyers query={recommendationQuery} lawyers={lawyers} loading={lawyersLoading} />
+        ) : (
+          <Card className="border-primary/20 bg-card p-4 shadow-soft">
+            <div className="flex items-center gap-2">
+              <Scale className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Recommended Lawyers</h2>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Ask a legal question and matching advocates will appear here based on the query and AI answer.
+            </p>
+          </Card>
+        )}
+      </aside>
     </div>
   );
 }

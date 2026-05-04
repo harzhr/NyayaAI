@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 function FullPageSpinner() {
@@ -11,17 +11,20 @@ function FullPageSpinner() {
 
 export function LawyerProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return <FullPageSpinner />;
   }
 
   if (!user) {
-    return <Navigate to="/lawyer-login" replace />;
+    const returnTo = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/lawyer-login?returnTo=${returnTo}`} replace />;
   }
 
   if (user.role !== "lawyer") {
-    return <Navigate to="/login" replace />;
+    const returnTo = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
   return <>{children}</>;

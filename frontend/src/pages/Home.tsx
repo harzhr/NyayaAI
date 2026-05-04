@@ -1,14 +1,41 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Scale, MessagesSquare, ShieldCheck, Languages, BookOpen, ArrowRight, Users } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  Gavel,
+  Languages,
+  MessagesSquare,
+  Radio,
+  Scale,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const features = [
-  { icon: MessagesSquare, title: "Conversational Legal Help", desc: "Ask anything about Indian law in plain English or हिंदी." },
-  { icon: BookOpen, title: "Relevant Acts & Sections", desc: "Get pointers to the laws and sections that apply to your situation." },
-  { icon: Languages, title: "Hindi & English", desc: "Bilingual answers tailored to how you ask." },
-  { icon: ShieldCheck, title: "Private & Secure", desc: "Your chats are stored against your account, never shared." },
+  {
+    icon: MessagesSquare,
+    title: "AI Legal Assistant",
+    desc: "AI breaks down your legal issue into simple steps you can understand.",
+  },
+  {
+    icon: Sparkles,
+    title: "Precision Matching",
+    desc: "Find the right lawyer tailored to your exact problem.",
+  },
+  {
+    icon: Gavel,
+    title: "Verified Lawyers",
+    desc: "Work with trusted professionals with proven experience.",
+  },
+  {
+    icon: Radio,
+    title: "Instant Consultation",
+    desc: "Chat live with lawyers without waiting.",
+  },
 ];
 
 export default function Home() {
@@ -17,91 +44,135 @@ export default function Home() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-subtle">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary"></div>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
       </div>
     );
   }
 
   return (
     <div className="bg-gradient-subtle">
-      {/* Hero */}
-      <section className="container mx-auto px-4 py-20 md:py-28">
+      <section className="container mx-auto px-4 py-16 md:py-24">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border bg-background/60 px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-soft">
-            <Scale className="h-3.5 w-3.5 text-primary" />
-            AI-powered legal guidance for India
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            AI Powered Legal Advisor 
           </div>
-          <h1 className="font-display text-4xl font-bold leading-tight md:text-6xl">
-            Understand the law.
-            <span className="block bg-gradient-hero bg-clip-text">Apni language mein, bina stress ke.</span>
+
+          <h1 className="font-display text-4xl font-bold leading-tight md:text-5xl">
+            AI-powered legal help for everyone.
+            <span className="block bg-gradient-hero bg-clip-text">Ab kanoon simple, aur lawyer accessible.</span>
           </h1>
+
           <p className="mt-6 text-base text-muted-foreground md:text-lg">
-            NyayaAI explains Indian laws, suggests relevant Acts, and walks you through next steps —
-            in simple Hindi and English. A helpful first stop, not a substitute for a lawyer.
+            From understanding your rights with AI to finding the perfect lawyer — NyayaAI gives you fast, smart, and reliable legal support.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4">
             <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
               <Button asChild size="lg" className="min-w-[220px] gap-2 shadow-elegant">
                 <Link to="/chat">
-                  {user ? "Continue chatting" : "Ask your legal question"}
+                  Get Legal Help with AI
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="min-w-[220px] gap-2">
-                <Link to="/lawyer-chat">Consult a lawyer <ArrowRight className="h-4 w-4" /></Link>
+                <Link to="/lawyer-chat">
+                  <Radio className="h-4 w-4" />
+                  Start Live Consultation
+                </Link>
               </Button>
               <Button asChild size="lg" variant="secondary" className="min-w-[220px] gap-2">
                 <Link to="/find-lawyer">
-                  <Users className="h-4 w-4" /> Browse advocates
+                  <Users className="h-4 w-4" />
+                  Find Top Lawyers
                 </Link>
               </Button>
             </div>
 
             {!user && (
-              <Button asChild size="md" variant="secondary" className="min-w-[220px] gap-2 px-6 py-3">
-                <Link to="/signup">Get started for free</Link>
+              <Button asChild size="default" variant="secondary" className="min-w-[220px] gap-2 px-6 py-3">
+                <Link to="/signup">Try NyayaAI Free</Link>
               </Button>
             )}
+          </div>
+
+          <div className="mx-auto mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+            {[
+              ["Specialization", "highest priority"],
+              ["City + experience", "better local fit"],
+              ["Rating", "extra confidence"],
+            ].map(([label, text]) => (
+              <div key={label} className="rounded-md border bg-background/70 px-4 py-3 shadow-sm">
+                <p className="text-sm font-semibold text-foreground">{label}</p>
+                <p className="text-xs text-muted-foreground">{text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Features */}
       <section className="container mx-auto px-4 pb-20">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {features.map((f) => (
-            <Card key={f.title} className="p-6 shadow-soft transition-shadow hover:shadow-elegant">
+        <div className="text-center mb-12">
+          <h2 className="font-display text-2xl font-bold md:text-3xl mb-4">
+            Why NyayaAI Works
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Everything you need for legal help in one place
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          {features.map((feature, index) => (
+            <Card 
+              key={feature.title} 
+              className={`h-full p-6 md:p-8 bg-gradient-to-br from-white/5 to-transparent border border-white/10 shadow-soft transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/5 flex flex-col justify-between ${
+                index === 0 ? 'ring-2 ring-primary/20 ring-offset-2 ring-offset-background' : ''
+              }`}
+            >
               <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <f.icon className="h-5 w-5" />
+                <feature.icon className="h-5 w-5" />
               </div>
-              <h3 className="font-display text-lg font-semibold">{f.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
+              <div className="flex-1">
+                <h3 className="font-display text-lg font-semibold">{feature.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{feature.desc}</p>
+              </div>
             </Card>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
       <section className="container mx-auto px-4 pb-24">
         <Card className="overflow-hidden border-0 bg-gradient-hero p-10 text-center text-primary-foreground shadow-elegant md:p-16">
-          <h2 className="font-display text-3xl font-bold md:text-4xl">Have a legal question?</h2>
+          <h2 className="font-display text-3xl font-bold md:text-4xl">
+            Ask once. Get legal clarity and lawyer options.
+          </h2>
           <p className="mx-auto mt-3 max-w-xl text-primary-foreground/85">
-            Get a clear, friendly explanation in seconds. Always remember to consult a qualified advocate for important matters.
+            The AI answer stays separate from lawyer recommendations, so you can read the guidance and review matched advocates side by side.
           </p>
-          <Button asChild size="lg" variant="secondary" className="mt-6 gap-2">
-            <Link to="/chat">Ask NyayaAI <ArrowRight className="h-4 w-4" /></Link>
-          </Button>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Button asChild size="lg" variant="secondary" className="gap-2">
+              <Link to="/chat">
+                Try smart matching
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="gap-2 border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            >
+              <Link to="/find-lawyer">Browse advocates</Link>
+            </Button>
+          </div>
         </Card>
       </section>
 
-      {/* Lawyer Section */}
       {!user && (
         <section className="container mx-auto px-4 py-16">
           <Card className="overflow-hidden border-0 bg-gradient-to-r from-blue-50 to-indigo-50 p-10 text-center shadow-elegant md:p-16 dark:from-blue-950/20 dark:to-indigo-950/20">
             <h2 className="font-display text-2xl font-bold md:text-3xl">Are you a legal professional?</h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Join our network of qualified lawyers and help users with their legal questions.
+              Join NyayaAI so users can discover you through smart matching and message you in realtime.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button asChild size="lg" className="min-w-[200px] gap-2">
@@ -120,12 +191,14 @@ export default function Home() {
           <div className="grid gap-10 md:grid-cols-3">
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-white">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-background text-lg font-bold">N</span>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-background text-lg font-bold">
+                  N
+                </span>
                 <span className="text-xl font-semibold">NyayaAI</span>
               </div>
               <p className="max-w-md text-sm text-slate-400">
-                NyayaAI is a legal assistant for Indian users, combining AI guidance with access to verified lawyer consultations.
-                It helps you understand law, find relevant sections, and connect to advocacy when needed.
+                NyayaAI combines AI legal guidance, smart lawyer matching, demo advocate discovery, and realtime lawyer chat
+                for Indian users who need a clearer next step.
               </p>
               <p className="text-xs text-slate-500">AI guidance is informative only and does not replace professional legal advice.</p>
             </div>
@@ -167,6 +240,12 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </footer>
+      
+      <footer className="w-full mt-10 pb-6">
+        <p className="text-xs text-muted-foreground text-center px-4">
+          © 2026 NyayaAI. Personal project built for educational and professional exploration. This platform does not provide legal advice.
+        </p>
       </footer>
     </div>
   );

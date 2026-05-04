@@ -22,6 +22,22 @@ import { toast } from "sonner";
 
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function isSameThread(row: LawyerChatRow, filter: ThreadFilter) {
+  if (filter.type === "live") {
+    return row.assigned_lawyer_id === filter.assignedLawyerId && row.demo_lawyer_key === null;
+  }
+
+  return row.demo_lawyer_key === filter.demoLawyerKey && row.assigned_lawyer_id === null;
+}
+
+function appendMessage(messages: LawyerChatRow[], row: LawyerChatRow) {
+  if (messages.some((message) => message.id === row.id)) {
+    return messages;
+  }
+
+  return [...messages, row].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
 export default function LawyerChatPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -124,6 +140,39 @@ export default function LawyerChatPage() {
     loadMessages();
   }, [loadMessages]);
 
+  useEffect(() => {
+    if (!user?.id || !threadFilter) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`lawyer-chat-user-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "lawyer_chats",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as LawyerChatRow;
+          if (isSameThread(row, threadFilter)) {
+            setMessages((prev) => appendMessage(prev, row));
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.warn("[LawyerChat] realtime subscription error");
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, threadFilter]);
+
   const selectRegistered = (lawyerId: string) => {
     const next: PersistedConsult = { v: 1, kind: "live", lawyerId };
     setConsult(next);
@@ -177,7 +226,7 @@ export default function LawyerChatPage() {
       return;
     }
 
-    setMessages((prev) => [...prev, data as LawyerChatRow]);
+    setMessages((prev) => appendMessage(prev, data as LawyerChatRow));
     setSending(false);
   };
 

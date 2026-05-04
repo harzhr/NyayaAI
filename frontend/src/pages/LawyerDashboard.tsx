@@ -41,7 +41,7 @@ export default function LawyerDashboard() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  const refreshInbox = useCallback(async () => {
+  const refreshInbox = useCallback(async (options?: { silent?: boolean }) => {
     if (user?.role !== "lawyer" || !user.id) {
       setSessions([]);
       setSelected(null);
@@ -49,7 +49,10 @@ export default function LawyerDashboard() {
       return;
     }
 
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
+
     const { rows, error } = await fetchLawyerInboxRows(user.id);
 
     if (error) {
@@ -75,6 +78,36 @@ export default function LawyerDashboard() {
   useEffect(() => {
     refreshInbox();
   }, [refreshInbox]);
+
+  useEffect(() => {
+    if (user?.role !== "lawyer" || !user.id) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`lawyer-inbox-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "lawyer_chats",
+          filter: `assigned_lawyer_id=eq.${user.id}`,
+        },
+        () => {
+          void refreshInbox({ silent: true });
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.warn("[LawyerDashboard] realtime subscription error");
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshInbox, user?.id, user?.role]);
 
   const handleSend = async () => {
     if (!selected || !reply.trim() || !user) {

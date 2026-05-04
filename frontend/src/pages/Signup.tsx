@@ -35,9 +35,15 @@ export default function Signup() {
     }
     setLoading(true);
     try {
-      await signup(parsed.data.email, parsed.data.password, parsed.data.name);
+      const profile = await signup(parsed.data.email, parsed.data.password, parsed.data.name);
+      if (!profile) {
+        toast.success("Account created. Please verify your email, then sign in.");
+        navigate("/login");
+        return;
+      }
+
       toast.success("Account created!");
-      navigate("/");
+      navigate(returnTo ?? "/");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create account. Try again.";
       toast.error(message);
